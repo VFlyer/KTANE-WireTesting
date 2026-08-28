@@ -14,6 +14,7 @@ public class wireTesting : MonoBehaviour {
     public KMBombInfo Bomb;
     public KMAudio Audio;
     public KMBombModule Module;
+    public KMColorblindMode ColorblindHandler;
     public GameObject[] wireObjects;
     public KMSelectable[] wireSelectables;
     public Transform WireContainer;
@@ -38,7 +39,7 @@ public class wireTesting : MonoBehaviour {
     Wires[] Wires = new Wires[5];
     int stage = 1;
     string[,] validTable = new string[,] {
-        { "UwU", "x", "Three", "D", "Tree", "Red", "UwU", "Tree", "Red", "Tree", "Tree", "D", "UwU", "Tree", "one" },
+        { "UwU", "X", "Three", "D", "Tree", "Red", "UwU", "Tree", "Red", "Tree", "Tree", "D", "UwU", "Tree", "one" },
         { "Three", "UwU", "Two", "Two", "HELP", "Tree", "Tree", "UwU", "Tree", "X", "Two", "X", "D", "UwU", "HELP" },
         { "X", "HELP", "UwU", "HELP", "X", "one", "A", "Red", "UwU", "Four", "A", "Four", "HELP", "X", "UwU" },
         { "D", "one", "HELP", "UwU", "Four", "HELP", "Three", "HELP", "HELP", "UwU", "A", "A", "one", "X", "Red" },
@@ -78,19 +79,16 @@ public class wireTesting : MonoBehaviour {
             Wires[i].Startup();
             int dummy = i;
             wireSelectables[dummy].OnInteract = delegate () { Wires[dummy].wirecut(); return false; };
-            Log($"Wire {i+1} is colored {Wires[i].Color.name} and will {Wires[i].Action} when cut.");
+            Log($"Wire {i+1} is colored {Wires[i].Color.name.Replace("blacK", "Black")} and will {Wires[i].Action} when cut.");
         }
         DENY.OnInteract = delegate () { SolCheck(false); return false; };
         CONFIRM.OnInteract = delegate () { SolCheck(true); return false; };
     }
 
-    void Update () { //Shit that happens at any point after initialization
-        
-    }
-
     void SolCheck(bool type) {
         if(ModuleSolved) { return; }
-        int count = 0;
+        Log($"{boolToPressed(type)} was pressed at {Bomb.GetStrikes()} strike(s).");
+        int count;
         int count2 = 0;
         bool actualPress = false;
         foreach(Wires Wire in Wires) {
@@ -147,6 +145,7 @@ public class wireTesting : MonoBehaviour {
                         foreach(char i in "GHIJKLMNOPQRSTUVWXYZ") {
                             if(Bomb.GetSerialNumber().Contains(i)) {
                                 Wire.Valid = true;
+                                break;
                             }
                         }
                     } else {
@@ -161,7 +160,7 @@ public class wireTesting : MonoBehaviour {
                     }
                     break;
                 case "D":
-                    if(Bomb.IsPortPresent(Port.DVI)) {
+                    if(Bomb.IsPortPresent(KModkit.Port.DVI)) {
                         Wire.Valid = true;
                     }
                     break;
@@ -175,13 +174,12 @@ public class wireTesting : MonoBehaviour {
         foreach(Wires Wire in Wires) {
             if(Wire.Valid) { count++; }
         }
-        Log($"{boolToPressed(type)} was pressed.");
         if(count >= 4) { actualPress = true; }
-        if(actualPress == type) { Log($"Correct! Stage {stage.ToString()} complete."); StageUp(); } else { Strike(); }
+        if(actualPress == type) { Log($"Correct! Stage {stage} complete."); StageUp(); } else { Strike(); }
     }
 
     void StageUp() {
-        if(stage==5) {
+        if(stage==3) {
             LEDS[stage - 1].material = LEDMaterials[1];
             Solve();
             return;
@@ -243,23 +241,23 @@ public class wireTesting : MonoBehaviour {
         foreach(MeshRenderer LED in LEDS) {
             LED.material = LEDMaterials[0];
         }
+        Module.HandleStrike();
+        Log("Incorrect! Strike Issued.");
+        FakeStrike(false);
         stage = 1;
         Log($"Stage 1:");
         for(int i = 0; i < 5; i++) {
             Wires[i].Startup();
             Log($"Wire {i} is colored {Wires[i].Color.name} and will {Wires[i].Action} when cut.");
         }
-        Module.HandleStrike();
-        Log("Incorrect! Strike Issued.");
-        FakeStrike();
     }
 
     IEnumerator _blinkingCoroutine;
 
-    public void FakeStrike () {
+    public void FakeStrike (bool playSound = true) {
         if(_blinkingCoroutine != null)
             StopCoroutine(_blinkingCoroutine);
-        _blinkingCoroutine = StrikeBlink();
+        _blinkingCoroutine = StrikeBlink(playSound);
         StartCoroutine(_blinkingCoroutine);
     }
 
@@ -277,7 +275,8 @@ public class wireTesting : MonoBehaviour {
         StartCoroutine(_blinkingCoroutine);
     }
 
-    IEnumerator StrikeBlink() {
+    IEnumerator StrikeBlink(bool playStrikeSound = true) {
+        if (playStrikeSound)
         Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.Strike, transform);
         StatusLightMesh.material = StatusLightMaterials[1];
         yield return new WaitForSeconds(1f);
